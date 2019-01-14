@@ -117,7 +117,7 @@ STATIC mp_obj_t esp_neopixel_init_(mp_obj_t pin, mp_obj_t timing) {
     esp_neopixel_init(mp_hal_get_pin_obj(pin), mp_obj_get_int(timing));
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(esp_neopixel_init_obj, esp_neopixel_init_);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_neopixel_init_obj, esp_neopixel_init_);
 
 STATIC mp_obj_t esp_neopixel_write_(mp_obj_t pin, mp_obj_t buf, mp_obj_t timing) {
     mp_buffer_info_t bufinfo;
