@@ -14,7 +14,7 @@ class NeoPixel:
         self.buf = bytearray(n * bpp)
         self.pin.init(pin.OUT)
         self.timing = timing
-        neopixel_init(self.pin, timing)
+        neopixel_init(self.pin, self.timing)
 
     def __setitem__(self, index, val):
         offset = index * self.bpp

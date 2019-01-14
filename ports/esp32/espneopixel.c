@@ -10,7 +10,7 @@
 #include "driver/spi_master.h"
 #include "modesp.h"
 
-#define MAX_TRANSFER_SIZE 3*3*512
+#define MAX_TRANSFER_SIZE 3*3*128         //3 spi-bits per bit * 3 color bytes * 128 leds
 
 spi_device_handle_t spi;
 
@@ -35,13 +35,13 @@ void IRAM_ATTR esp_neopixel_init(uint8_t pin, uint8_t timing) {
         .sclk_io_num=-1,
         .quadwp_io_num=-1,
         .quadhd_io_num=-1,
-        .max_transfer_sz=3*3*512         //3 spi-bits per bit * 3 color bytes * 512 leds
+        .max_transfer_sz=MAX_TRANSFER_SIZE
     };
     spi_device_interface_config_t devcfg={
         .clock_speed_hz=24*1000*100,            //Clock out at 2.4 MHz
         .mode=0,                                //SPI mode 0
-        .spics_io_num=-1,               //CS pin
-        .queue_size=32,                          //We want to be able to queue 32 transactions at a time
+        .spics_io_num=-1,                       //CS pin
+        .queue_size=32,                         //We want to be able to queue 32 transactions at a time
     };
     if (!timing) {
             devcfg.clock_speed_hz = 12*1000*100;
