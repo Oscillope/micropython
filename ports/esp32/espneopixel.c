@@ -7,47 +7,61 @@
 
 #include "py/mpconfig.h"
 #include "py/mphal.h"
+#include "driver/spi_common.h"
 #include "modesp.h"
 
-void IRAM_ATTR esp_neopixel_write(uint8_t pin, uint8_t *pixels, uint32_t numBytes, uint8_t timing) {
-    uint8_t *p, *end, pix, mask;
-    uint32_t t, time0, time1, period, c, startTime, pinMask;
+spi_device_handle_t spi;
 
-    pinMask   = 1 << pin;
-    p         =  pixels;
-    end       =  p + numBytes;
-    pix       = *p++;
-    mask      = 0x80;
-    startTime = 0;
-
-    uint32_t fcpu = ets_get_cpu_frequency() * 1000000;
-
-    if (timing == 1) {
-        // 800 KHz
-        time0 = (fcpu * 0.35) / 1000000; // 0.35us
-        time1 = (fcpu * 0.8) / 1000000; // 0.8us
-        period = (fcpu * 1.25) / 1000000; // 1.25us per bit
-    } else {
-        // 400 KHz
-        time0 = (fcpu * 0.5) / 1000000; // 0.35us
-        time1 = (fcpu * 1.2) / 1000000; // 0.8us
-        period = (fcpu * 2.5) / 1000000; // 1.25us per bit
-    }
-
-    uint32_t irq_state = mp_hal_quiet_timing_enter();
-    for (t = time0;; t = time0) {
-        if (pix & mask) t = time1;                                  // Bit high duration
-        while (((c = mp_hal_ticks_cpu()) - startTime) < period);    // Wait for bit start
-        GPIO_REG_WRITE(GPIO_OUT_W1TS_REG, pinMask);                 // Set high
-        startTime = c;                                              // Save start time
-        while (((c = mp_hal_ticks_cpu()) - startTime) < t);         // Wait high duration
-        GPIO_REG_WRITE(GPIO_OUT_W1TC_REG, pinMask);                 // Set low
-        if (!(mask >>= 1)) {                                        // Next bit/byte
-            if(p >= end) break;
-            pix  = *p++;
-            mask = 0x80;
+uint32_t spi_encode(uint8_t color) {
+    uint32_t out = 0;
+    for (uint8_t mask = 0x80; mask; mask >>= 1) {
+        out = out << 3;
+        if (data & mask) {
+            out = out | 0B110; // ws2812 "1"
+        } else {
+            out = out | 0B100; // ws2812 "0"
         }
     }
-    while ((mp_hal_ticks_cpu() - startTime) < period); // Wait for last bit
-    mp_hal_quiet_timing_exit(irq_state);
+    return out;
+}
+
+void IRAM_ATTR esp_neopixel_init(uint8_t pin, uint8_t timing) {
+    esp_err_t ret;
+    spi_bus_config_t buscfg={
+        .mosi_io_num=pin,
+        .miso_io_num=-1,
+        .sclk_io_num=-1,
+        .quadwp_io_num=-1,
+        .quadhd_io_num=-1,
+        .max_transfer_sz=3*3*512         //3 spi-bits per bit * 3 color bytes * 512 leds
+    };
+    spi_device_interface_config_t devcfg={
+        .clock_speed_hz=24*1000*100,            //Clock out at 2.4 MHz
+        .mode=0,                                //SPI mode 0
+        .spics_io_num=PIN_NUM_CS,               //CS pin
+        .queue_size=7,                          //We want to be able to queue 7 transactions at a time
+        .pre_cb=lcd_spi_pre_transfer_callback,  //Specify pre-transfer callback to handle D/C line
+    };
+    if (!timing) {
+            devcfg.clock_speed_hz = 12*1000*100;
+    }
+    //Initialize the SPI bus
+    ret=spi_bus_initialize(HSPI_HOST, &buscfg, 1);
+    ESP_ERROR_CHECK(ret);
+    //Attach the LCD to the SPI bus
+    ret=spi_bus_add_device(HSPI_HOST, &devcfg, &spi);
+    ESP_ERROR_CHECK(ret);
+}
+
+void IRAM_ATTR esp_neopixel_write(uint8_t pin, uint8_t *pixels, uint32_t numBytes, uint8_t timing) {
+    int i = 0;
+    uint8_t pixBuf[numBytes * 3] = { 0 };
+    for (i = 0; i < numBytes; i++) {
+        pixBuf[i * 3] = spi_encode(*pixels + i) & 0x00ffffff;
+    }
+    struct spi_transaction_t trans = (struct spi_transaction_t){
+        .length = numBytes * 3,
+        .txbuffer = &pixBuf
+    };
+    spi_device_queue_trans(&spi, &trans, 0);
 }
