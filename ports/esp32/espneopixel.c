@@ -10,9 +10,10 @@
 #include "driver/spi_master.h"
 #include "modesp.h"
 
-#define MAX_TRANSFER_SIZE 3*3*128         //3 spi-bits per bit * 3 color bytes * 128 leds
+#define MAX_TRANSFER_SIZE 3*3*256         //3 spi-bits per bit * 3 color bytes * 256 leds
 
-spi_device_handle_t spi;
+static spi_device_handle_t spi;
+static uint8_t* pixBuf;
 
 // This table generated based on the algorithm at:
 // https://www.rogerclark.net/arduino-stm32-neopixels-ws2812b-using-spi-dma/
@@ -74,17 +75,19 @@ void IRAM_ATTR esp_neopixel_init(uint8_t pin, uint8_t timing) {
     //Attach the LCD to the SPI bus
     ret=spi_bus_add_device(HSPI_HOST, &devcfg, &spi);
     ESP_ERROR_CHECK(ret);
+
+    // Allocate a big ol' buffer, of DMA-able memory
+    pixBuf = heap_caps_malloc(MAX_TRANSFER_SIZE, MALLOC_CAP_DMA);
 }
 
 void IRAM_ATTR esp_neopixel_write(uint8_t pin, uint8_t *pixels, uint32_t numBytes, uint8_t timing) {
     int i = 0;
-    uint8_t pixBuf[MAX_TRANSFER_SIZE] = { 0 };
     for (i = 0; i < numBytes; i++) {
-        pixBuf[i * 3] = spi_encode[*pixels + i] & 0x00ffffff;
+        pixBuf[i * 3] = spi_encode[*(pixels + i)] & 0x00ffffff;
     }
     struct spi_transaction_t trans = (struct spi_transaction_t){
         .length = numBytes * 3,
-        .tx_buffer = &pixBuf
+        .tx_buffer = pixBuf
     };
     spi_device_queue_trans(spi, &trans, 0);
 }
