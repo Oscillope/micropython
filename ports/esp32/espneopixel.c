@@ -61,13 +61,14 @@ void IRAM_ATTR esp_neopixel_init(uint8_t pin, uint8_t timing) {
         .max_transfer_sz=MAX_TRANSFER_SIZE
     };
     spi_device_interface_config_t devcfg={
-        .clock_speed_hz=24*1000*100,            //Clock out at 2.4 MHz
+        .clock_speed_hz=12*1000*100,            //Clock out at 1.2 MHz (400kHz * 3)
         .mode=0,                                //SPI mode 0
         .spics_io_num=-1,                       //CS pin
         .queue_size=32,                         //We want to be able to queue 32 transactions at a time
     };
-    if (!timing) {
-            devcfg.clock_speed_hz = 12*1000*100;
+    if (timing) {
+        // Set clock to 2.4 MHz (800kHz * 3)
+        devcfg.clock_speed_hz = 24*1000*100;
     }
     //Initialize the SPI bus
     ret=spi_bus_initialize(HSPI_HOST, &buscfg, 1);
