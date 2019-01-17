@@ -17,7 +17,8 @@ static uint8_t* pixBuf = NULL;
 
 // This table generated based on the algorithm at:
 // https://www.rogerclark.net/arduino-stm32-neopixels-ws2812b-using-spi-dma/
-static const uint32_t spi_encode[0xff] = {0x00924924, 0x00924926, 0x00924934, 0x00924936, 0x009249a4, 0x009249a6, 0x009249b4, 0x009249b6,
+static const uint32_t spi_encode[0xff] = {
+0x00924924, 0x00924926, 0x00924934, 0x00924936, 0x009249a4, 0x009249a6, 0x009249b4, 0x009249b6,
 0x00924d24, 0x00924d26, 0x00924d34, 0x00924d36, 0x00924da4, 0x00924da6, 0x00924db4, 0x00924db6,
 0x00926924, 0x00926926, 0x00926934, 0x00926936, 0x009269a4, 0x009269a6, 0x009269b4, 0x009269b6,
 0x00926d24, 0x00926d26, 0x00926d34, 0x00926d36, 0x00926da4, 0x00926da6, 0x00926db4, 0x00926db6,
@@ -58,13 +59,16 @@ void IRAM_ATTR esp_neopixel_init(uint8_t pin, uint8_t timing) {
         .sclk_io_num=-1,
         .quadwp_io_num=-1,
         .quadhd_io_num=-1,
-        .max_transfer_sz=MAX_TRANSFER_SIZE
+        .max_transfer_sz=MAX_TRANSFER_SIZE,
+        .flags=SPICOMMON_BUSFLAG_MASTER
     };
     spi_device_interface_config_t devcfg={
         .clock_speed_hz=12*1000*100,            //Clock out at 1.2 MHz (400kHz * 3)
         .mode=0,                                //SPI mode 0
+        .command_bits=0,
+        .address_bits=0,
         .spics_io_num=-1,                       //CS pin
-        .queue_size=32,                         //We want to be able to queue 32 transactions at a time
+        .queue_size=1,                          //We want to be able to queue 1 transaction at a time
     };
     if (timing) {
         // Set clock to 2.4 MHz (800kHz * 3)
@@ -92,7 +96,7 @@ void IRAM_ATTR esp_neopixel_write(uint8_t pin, uint8_t *pixels, uint32_t numByte
             .length = numBytes * 3,
             .tx_buffer = pixBuf
         };
-        spi_device_queue_trans(spi, &trans, 0);
+        spi_device_transmit(spi, &trans);
     } else {
          // Use bit-banging method
         uint8_t *p, *end, pix, mask;
