@@ -7,12 +7,11 @@
 
 #include "py/mpconfig.h"
 #include "py/mphal.h"
-#include "driver/spi_master.h"
+#include "driver/i2s.h"
 #include "modesp.h"
 
-#define MAX_TRANSFER_SIZE 3*3*256         //3 spi-bits per bit * 3 color bytes * 256 leds
+#define MAX_TRANSFER_SIZE 1024         //3 spi-bits per bit * 3 color bytes * 256 leds
 
-static spi_device_handle_t spi;
 static uint8_t* pixBuf = NULL;
 
 // This table generated based on the algorithm at:
@@ -50,53 +49,65 @@ static const uint32_t spi_encode[0xff] = {
 0x00db4d24, 0x00db4d26, 0x00db4d34, 0x00db4d36, 0x00db4da4, 0x00db4da6, 0x00db4db4, 0x00db4db6,
 0x00db6924, 0x00db6926, 0x00db6934, 0x00db6936, 0x00db69a4, 0x00db69a6, 0x00db69b4, 0x00db69b6,
 0x00db6d24, 0x00db6d26, 0x00db6d34, 0x00db6d36, 0x00db6da4, 0x00db6da6, 0x00db6db4};
+uint32_t convert(uint8_t data)
+{
+  uint32_t out=0;
+  for(uint8_t mask = 0x80; mask; mask >>= 1)  
+  {
+    out=out<<3;
+    if (data & mask)
+    {
+      out = out | 0b110;//Bit high
+    }
+    else
+    {
+      out = out | 0b100;// bit low
+    }
+  }
+  return out;
+}
 
 void IRAM_ATTR esp_neopixel_init(uint8_t pin, uint8_t timing) {
-    esp_err_t ret;
-    spi_bus_config_t buscfg={
-        .mosi_io_num=pin,
-        .miso_io_num=-1,
-        .sclk_io_num=-1,
-        .quadwp_io_num=-1,
-        .quadhd_io_num=-1,
-        .max_transfer_sz=MAX_TRANSFER_SIZE,
-        .flags=SPICOMMON_BUSFLAG_MASTER
+    static const i2s_config_t i2s_config = {
+         .mode = I2S_MODE_MASTER | I2S_MODE_TX,
+         .sample_rate = 35191,
+         .bits_per_sample = 32,
+         .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+         .communication_format = I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB,
+         .intr_alloc_flags = 0, // default interrupt priority
+         .dma_buf_count = 8,
+         .dma_buf_len = MAX_TRANSFER_SIZE,
+         .use_apll = true,
+         .fixed_mclk = 2252252
     };
-    spi_device_interface_config_t devcfg={
-        .clock_speed_hz=12*1000*100,            //Clock out at 1.2 MHz (400kHz * 3)
-        .mode=0,                                //SPI mode 0
-        .command_bits=0,
-        .address_bits=0,
-        .spics_io_num=-1,                       //CS pin
-        .queue_size=1,                          //We want to be able to queue 1 transaction at a time
+    static const i2s_pin_config_t pin_config = {
+        .bck_io_num = 26,
+        .ws_io_num = 25,
+        .data_out_num = 22,
+        .data_in_num = I2S_PIN_NO_CHANGE
     };
-    if (timing) {
-        // Set clock to 2.4 MHz (800kHz * 3)
-        devcfg.clock_speed_hz = 24*1000*100;
-    }
-    //Initialize the SPI bus
-    ret=spi_bus_initialize(HSPI_HOST, &buscfg, 1);
-    ESP_ERROR_CHECK(ret);
-    //Attach the LCD to the SPI bus
-    ret=spi_bus_add_device(HSPI_HOST, &devcfg, &spi);
-    ESP_ERROR_CHECK(ret);
+    i2s_driver_install(0, &i2s_config, 0, NULL);
+    i2s_set_pin(0, &pin_config);
 
     // Allocate a big ol' buffer, of DMA-able memory
     pixBuf = heap_caps_malloc(MAX_TRANSFER_SIZE, MALLOC_CAP_DMA);
+    //int i;
+    //for (i = 0; i < MAX_TRANSFER_SIZE/4; i++) {
+    //        pixBuf[i * 4] = i;
+    //}
 }
 
 void IRAM_ATTR esp_neopixel_write(uint8_t pin, uint8_t *pixels, uint32_t numBytes, uint8_t timing) {
     if (pixBuf) {
         // Use DMA transfer
         int i = 0;
+        size_t written;
+        i2s_zero_dma_buffer(0);
         for (i = 0; i < numBytes; i++) {
-            pixBuf[i * 3] = spi_encode[*(pixels + i)] & 0x00ffffff;
+            pixBuf[i * 3] = spi_encode[pixels[i]] & 0x00ffffff;
+            //pixBuf[i * 3] = convert(*(pixels + i));
         }
-        struct spi_transaction_t trans = (struct spi_transaction_t){
-            .length = numBytes * 3,
-            .tx_buffer = pixBuf
-        };
-        spi_device_transmit(spi, &trans);
+        i2s_write(0, pixBuf, MAX_TRANSFER_SIZE, &written, 500);
     } else {
          // Use bit-banging method
         uint8_t *p, *end, pix, mask;
