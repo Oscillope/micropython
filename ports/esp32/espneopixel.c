@@ -91,9 +91,9 @@ static const uint32_t spi_encode[0xff] = {
 void IRAM_ATTR esp_neopixel_init(uint8_t pin, uint8_t timing) {
     esp_err_t ret;
     spi_bus_config_t buscfg={
-        .mosi_io_num=22,
+        .mosi_io_num=pin,
         .miso_io_num=-1,
-        .sclk_io_num=26,
+        .sclk_io_num=-1,
         .quadwp_io_num=-1,
         .quadhd_io_num=-1,
         .max_transfer_sz=MAX_TRANSFER_SIZE,
@@ -106,7 +106,7 @@ void IRAM_ATTR esp_neopixel_init(uint8_t pin, uint8_t timing) {
         .address_bits=0,
         .dummy_bits=0,
         .spics_io_num=-1,                       //CS pin
-        .queue_size=1,                          //We want to be able to queue 1 transaction at a time
+        .queue_size=16,                         //We want to be able to queue 1 transaction at a time
     };
     if (timing) {
         // Set clock to 2.4 MHz (800kHz * 3)
@@ -135,7 +135,7 @@ void IRAM_ATTR esp_neopixel_write(uint8_t pin, uint8_t *pixels, uint32_t numByte
             .length = numBytes * 3 * 8, // Length is in bits
             .tx_buffer = pixBuf
         };
-        spi_device_transmit(spi, &trans);
+        spi_device_queue_trans(spi, &trans, 0);
     } else {
          // Use bit-banging method
         uint8_t *p, *end, pix, mask;
