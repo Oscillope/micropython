@@ -11,7 +11,7 @@
 #include "driver/spi_master.h"
 #include "modesp.h"
 
-#define MAX_TRANSFER_SIZE 3*3*256         //3 spi-bits per bit * 3 color bytes * 256 leds
+#define MAX_TRANSFER_SIZE 3*3*400         //3 spi-bits per bit * 3 color bytes * 256 leds
 
 static spi_device_handle_t spi;
 static uint8_t* pixBuf = NULL;
@@ -100,10 +100,11 @@ void IRAM_ATTR esp_neopixel_init(uint8_t pin, uint8_t timing) {
         .flags=SPICOMMON_BUSFLAG_MASTER
     };
     spi_device_interface_config_t devcfg={
-        .clock_speed_hz=12*1000*100,            //Clock out at 1.2 MHz (400kHz * 3)
+        .clock_speed_hz=1200000,                //Clock out at 1.2 MHz (400kHz * 3)
         .mode=0,                                //SPI mode 0
         .command_bits=0,
         .address_bits=0,
+        .dummy_bits=0,
         .spics_io_num=-1,                       //CS pin
         .queue_size=1,                          //We want to be able to queue 1 transaction at a time
     };
@@ -127,11 +128,11 @@ void IRAM_ATTR esp_neopixel_write(uint8_t pin, uint8_t *pixels, uint32_t numByte
         // Use DMA transfer
         int i = 0;
         for (i = 0; i < numBytes; i++) {
-            *((uint32_t*)(pixBuf + (i * 3))) = spi_encode[pixels[i]] & 0x00ffffff;
+            *((uint32_t*)(pixBuf + (i * 3))) = spi_encode[pixels[i]] >> 8;
         }
-        ESP_LOGI("spi_master", "pixBuf %p pixels %p numBytes %u", pixBuf, pixels, numBytes);
+        //ESP_LOGI("espneopixel", "pixBuf %p pixels %p numBytes %u", pixBuf, pixels, numBytes);
         struct spi_transaction_t trans = (struct spi_transaction_t){
-            .length = MAX_TRANSFER_SIZE,
+            .length = numBytes * 3 * 8, // Length is in bits
             .tx_buffer = pixBuf
         };
         spi_device_transmit(spi, &trans);
