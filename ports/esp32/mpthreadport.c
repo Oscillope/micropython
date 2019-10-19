@@ -27,13 +27,15 @@
 
 #include "stdio.h"
 
-#include "py/mpconfig.h"
-#include "py/mpstate.h"
 #include "py/gc.h"
 #include "py/mpthread.h"
+#include "py/mphal.h"
 #include "mpthreadport.h"
 
 #include "esp_task.h"
+#if !MICROPY_ESP_IDF_4
+#include "freertos/semphr.h"
+#endif
 
 #if MICROPY_PY_THREAD
 
@@ -54,7 +56,7 @@ typedef struct _thread_t {
 // the mutex controls access to the linked list
 STATIC mp_thread_mutex_t thread_mutex;
 STATIC thread_t thread_entry0;
-STATIC thread_t *thread; // root pointer, handled by mp_thread_gc_others
+STATIC thread_t *thread = NULL; // root pointer, handled by mp_thread_gc_others
 
 void mp_thread_init(void *stack, uint32_t stack_len) {
     mp_thread_set_state(&mp_state_ctx.thread);
@@ -130,7 +132,7 @@ void mp_thread_create_ex(void *(*entry)(void*), void *arg, size_t *stack_size, i
     mp_thread_mutex_lock(&thread_mutex, 1);
 
     // create thread
-    BaseType_t result = xTaskCreate(freertos_entry, name, *stack_size / sizeof(StackType_t), arg, priority, &th->id);
+    BaseType_t result = xTaskCreatePinnedToCore(freertos_entry, name, *stack_size / sizeof(StackType_t), arg, priority, &th->id, MP_TASK_COREID);
     if (result != pdPASS) {
         mp_thread_mutex_unlock(&thread_mutex);
         nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, "can't create thread"));
@@ -166,6 +168,10 @@ void mp_thread_finish(void) {
 }
 
 void vPortCleanUpTCB(void *tcb) {
+    if (thread == NULL) {
+        // threading not yet initialised
+        return;
+    }
     thread_t *prev = NULL;
     mp_thread_mutex_lock(&thread_mutex, 1);
     for (thread_t *th = thread; th != NULL; prev = th, th = th->next) {

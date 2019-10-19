@@ -7,10 +7,10 @@
 
 #define MICROPY_HW_HAS_SWITCH       (1)
 #define MICROPY_HW_HAS_FLASH        (1)
-#define MICROPY_HW_HAS_SDCARD       (1)
 #define MICROPY_HW_ENABLE_RNG       (1)
 #define MICROPY_HW_ENABLE_RTC       (1)
 #define MICROPY_HW_ENABLE_USB       (1)
+#define MICROPY_HW_ENABLE_SDCARD    (1)
 
 #define MICROPY_BOARD_EARLY_INIT    board_early_init
 void board_early_init(void);
@@ -100,7 +100,14 @@ void board_early_init(void);
 #define MICROPY_HW_ETH_RMII_TXD1    (pin_G14)
 
 #if 0
-// Optional SDRAM configuration; requires SYSCLK <= 200MHz
+// Optional SDRAM configuration.
+
+// Note: This requires SYSCLK <= 200MHz. 192MHz example below:
+// #define MICROPY_HW_CLK_PLLM (25)
+// #define MICROPY_HW_CLK_PLLN (384)
+// #define MICROPY_HW_CLK_PLLP (RCC_PLLP_DIV2)
+// #define MICROPY_HW_CLK_PLLQ (8)
+
 #define MICROPY_HW_SDRAM_SIZE (128 * 1024 * 1024 / 8) // 128 Mbit
 #define MICROPY_HW_SDRAM_STARTUP_TEST (0)
 #define MICROPY_HEAP_START sdram_start()
@@ -119,7 +126,7 @@ void board_early_init(void);
 #define MICROPY_HW_SDRAM_BURST_LENGTH       1
 #define MICROPY_HW_SDRAM_CAS_LATENCY        2
 #define MICROPY_HW_SDRAM_COLUMN_BITS_NUM    8
-#define MICROPY_HW_SDRAM_ROW_BITS_NUM       13
+#define MICROPY_HW_SDRAM_ROW_BITS_NUM       12
 #define MICROPY_HW_SDRAM_MEM_BUS_WIDTH      32
 #define MICROPY_HW_SDRAM_INTERN_BANKS_NUM   4
 #define MICROPY_HW_SDRAM_CLOCK_PERIOD       2

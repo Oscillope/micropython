@@ -101,8 +101,8 @@
 #define MICROPY_PY_BUILTINS_SLICE_ATTRS (1)
 #define MICROPY_PY_BUILTINS_ROUND_INT (1)
 #define MICROPY_PY_ALL_SPECIAL_METHODS (1)
-#define MICROPY_PY_BUILTINS_COMPILE (1)
-#define MICROPY_PY_BUILTINS_EXECFILE (1)
+#define MICROPY_PY_BUILTINS_COMPILE (MICROPY_ENABLE_COMPILER)
+#define MICROPY_PY_BUILTINS_EXECFILE (MICROPY_ENABLE_COMPILER)
 #define MICROPY_PY_BUILTINS_NOTIMPLEMENTED (1)
 #define MICROPY_PY_BUILTINS_INPUT   (1)
 #define MICROPY_PY_BUILTINS_POW3    (1)
@@ -114,6 +114,7 @@
 #define MICROPY_PY_COLLECTIONS_DEQUE (1)
 #define MICROPY_PY_COLLECTIONS_ORDEREDDICT (1)
 #define MICROPY_PY_MATH_SPECIAL_FUNCTIONS (1)
+#define MICROPY_PY_MATH_ISCLOSE     (1)
 #define MICROPY_PY_MATH_FACTORIAL   (1)
 #define MICROPY_PY_CMATH            (1)
 #define MICROPY_PY_IO               (1)
@@ -139,13 +140,18 @@
 #define MICROPY_PY_URE_SUB          (1)
 #define MICROPY_PY_UHEAPQ           (1)
 #define MICROPY_PY_UHASHLIB         (1)
+#define MICROPY_PY_UHASHLIB_MD5     (MICROPY_PY_USSL)
+#define MICROPY_PY_UHASHLIB_SHA1    (MICROPY_PY_USSL)
+#define MICROPY_PY_UCRYPTOLIB       (MICROPY_PY_USSL)
 #define MICROPY_PY_UBINASCII        (1)
 #define MICROPY_PY_URANDOM          (1)
 #define MICROPY_PY_URANDOM_EXTRA_FUNCS (1)
 #define MICROPY_PY_USELECT          (1)
 #define MICROPY_PY_UTIMEQ           (1)
 #define MICROPY_PY_UTIME_MP_HAL     (1)
-#define MICROPY_PY_OS_DUPTERM       (1)
+#define MICROPY_PY_OS_DUPTERM       (3)
+#define MICROPY_PY_UOS_DUPTERM_BUILTIN_STREAM (1)
+#define MICROPY_PY_LWIP_SOCK_RAW    (MICROPY_PY_LWIP)
 #define MICROPY_PY_MACHINE          (1)
 #define MICROPY_PY_MACHINE_PULSE    (1)
 #define MICROPY_PY_MACHINE_PIN_MAKE_NEW mp_pin_make_new
@@ -159,7 +165,11 @@
 #define MICROPY_PY_MACHINE_SPI_MAKE_NEW machine_hard_spi_make_new
 #define MICROPY_HW_SOFTSPI_MIN_DELAY (0)
 #define MICROPY_HW_SOFTSPI_MAX_BAUDRATE (HAL_RCC_GetSysClockFreq() / 48)
+#define MICROPY_PY_UWEBSOCKET       (MICROPY_PY_LWIP)
+#define MICROPY_PY_WEBREPL          (MICROPY_PY_LWIP)
+#ifndef MICROPY_PY_FRAMEBUF
 #define MICROPY_PY_FRAMEBUF         (1)
+#endif
 #ifndef MICROPY_PY_USOCKET
 #define MICROPY_PY_USOCKET          (1)
 #endif
@@ -201,6 +211,7 @@ extern const struct _mp_obj_module_t mp_module_uos;
 extern const struct _mp_obj_module_t mp_module_utime;
 extern const struct _mp_obj_module_t mp_module_usocket;
 extern const struct _mp_obj_module_t mp_module_network;
+extern const struct _mp_obj_module_t mp_module_bluetooth;
 extern const struct _mp_obj_module_t mp_module_onewire;
 
 #if MICROPY_PY_STM
@@ -223,10 +234,22 @@ extern const struct _mp_obj_module_t mp_module_onewire;
 #define SOCKET_BUILTIN_MODULE_WEAK_LINKS
 #endif
 
+#if MICROPY_PY_USSL
+#define SSL_BUILTIN_MODULE_WEAK_LINKS       { MP_ROM_QSTR(MP_QSTR_ssl), MP_ROM_PTR(&mp_module_ussl) },
+#else
+#define SSL_BUILTIN_MODULE_WEAK_LINKS
+#endif
+
 #if MICROPY_PY_NETWORK
 #define NETWORK_BUILTIN_MODULE              { MP_ROM_QSTR(MP_QSTR_network), MP_ROM_PTR(&mp_module_network) },
 #else
 #define NETWORK_BUILTIN_MODULE
+#endif
+
+#if MICROPY_PY_BLUETOOTH
+#define BLUETOOTH_BUILTIN_MODULE              { MP_ROM_QSTR(MP_QSTR_bluetooth), MP_ROM_PTR(&mp_module_bluetooth) },
+#else
+#define BLUETOOTH_BUILTIN_MODULE
 #endif
 
 #define MICROPY_PORT_BUILTIN_MODULES \
@@ -237,6 +260,7 @@ extern const struct _mp_obj_module_t mp_module_onewire;
     { MP_ROM_QSTR(MP_QSTR_utime), MP_ROM_PTR(&mp_module_utime) }, \
     SOCKET_BUILTIN_MODULE \
     NETWORK_BUILTIN_MODULE \
+    BLUETOOTH_BUILTIN_MODULE \
     { MP_ROM_QSTR(MP_QSTR__onewire), MP_ROM_PTR(&mp_module_onewire) }, \
 
 #define MICROPY_PORT_BUILTIN_MODULE_WEAK_LINKS \
@@ -253,6 +277,7 @@ extern const struct _mp_obj_module_t mp_module_onewire;
     { MP_ROM_QSTR(MP_QSTR_time), MP_ROM_PTR(&mp_module_utime) }, \
     { MP_ROM_QSTR(MP_QSTR_select), MP_ROM_PTR(&mp_module_uselect) }, \
     SOCKET_BUILTIN_MODULE_WEAK_LINKS \
+    SSL_BUILTIN_MODULE_WEAK_LINKS \
     { MP_ROM_QSTR(MP_QSTR_struct), MP_ROM_PTR(&mp_module_ustruct) }, \
     { MP_ROM_QSTR(MP_QSTR_machine), MP_ROM_PTR(&machine_module) }, \
     { MP_ROM_QSTR(MP_QSTR_errno), MP_ROM_PTR(&mp_module_uerrno) }, \
@@ -265,6 +290,19 @@ extern const struct _mp_obj_module_t mp_module_onewire;
     STM_BUILTIN_MODULE \
 
 #define MP_STATE_PORT MP_STATE_VM
+
+#if MICROPY_SSL_MBEDTLS
+#define MICROPY_PORT_ROOT_POINTER_MBEDTLS void **mbedtls_memory;
+#else
+#define MICROPY_PORT_ROOT_POINTER_MBEDTLS
+#endif
+
+#if MICROPY_BLUETOOTH_NIMBLE
+struct _mp_bluetooth_nimble_root_pointers_t;
+#define MICROPY_PORT_ROOT_POINTER_BLUETOOTH_NIMBLE void **bluetooth_nimble_memory; struct _mp_bluetooth_nimble_root_pointers_t *bluetooth_nimble_root_pointers;
+#else
+#define MICROPY_PORT_ROOT_POINTER_BLUETOOTH_NIMBLE
+#endif
 
 #define MICROPY_PORT_ROOT_POINTERS \
     const char *readline_hist[8]; \
@@ -290,10 +328,13 @@ extern const struct _mp_obj_module_t mp_module_onewire;
     struct _pyb_uart_obj_t *pyb_uart_obj_all[MICROPY_HW_MAX_UART]; \
     \
     /* pointers to all CAN objects (if they have been created) */ \
-    struct _pyb_can_obj_t *pyb_can_obj_all[2]; \
+    struct _pyb_can_obj_t *pyb_can_obj_all[MICROPY_HW_MAX_CAN]; \
     \
     /* list of registered NICs */ \
     mp_obj_list_t mod_network_nic_list; \
+    \
+    MICROPY_PORT_ROOT_POINTER_MBEDTLS \
+    MICROPY_PORT_ROOT_POINTER_BLUETOOTH_NIMBLE \
 
 // type definitions for the specific machine
 
@@ -364,14 +405,6 @@ static inline mp_uint_t disable_irq(void) {
 
 // We need an implementation of the log2 function which is not a macro
 #define MP_NEED_LOG2 (1)
-
-// There is no classical C heap in bare-metal ports, only Python
-// garbage-collected heap. For completeness, emulate C heap via
-// GC heap. Note that MicroPython core never uses malloc() and friends,
-// so these defines are mostly to help extension module writers.
-#define malloc(n) m_malloc(n)
-#define free(p) m_free(p)
-#define realloc(p, n) m_realloc(p, n)
 
 // We need to provide a declaration/definition of alloca()
 #include <alloca.h>

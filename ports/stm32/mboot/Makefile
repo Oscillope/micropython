@@ -8,6 +8,10 @@ BUILD ?= build-$(BOARD)
 # Allow the directory containing the board configuration to be specified
 BOARD_DIR ?= $(abspath ../boards/$(BOARD))
 
+# Set USE_MBOOT to 1 so that TEXT0_ADDR gets set properly for those boards
+# that can be built with or without mboot.
+USE_MBOOT ?= 1
+
 # Sanity check that the board configuration directory exists
 ifeq ($(wildcard $(BOARD_DIR)/.),)
 $(error Invalid BOARD specified: $(BOARD_DIR))
@@ -16,8 +20,10 @@ endif
 include ../../../py/mkenv.mk
 include $(BOARD_DIR)/mpconfigboard.mk
 
-CMSIS_DIR=$(TOP)/lib/stm32lib/CMSIS/STM32$(MCU_SERIES_UPPER)xx/Include
 MCU_SERIES_UPPER = $(shell echo $(MCU_SERIES) | tr '[:lower:]' '[:upper:]')
+CMSIS_MCU_LOWER = $(shell echo $(CMSIS_MCU) | tr '[:upper:]' '[:lower:]')
+
+CMSIS_DIR=$(TOP)/lib/stm32lib/CMSIS/STM32$(MCU_SERIES_UPPER)xx/Include
 HAL_DIR=lib/stm32lib/STM32$(MCU_SERIES_UPPER)xx_HAL_Driver
 USBDEV_DIR=usbdev
 DFU=$(TOP)/tools/dfu.py
@@ -26,6 +32,7 @@ DEVICE=0483:df11
 STFLASH ?= st-flash
 OPENOCD ?= openocd
 OPENOCD_CONFIG ?= boards/openocd_stm32f4.cfg
+STARTUP_FILE ?= lib/stm32lib/CMSIS/STM32$(MCU_SERIES_UPPER)xx/Source/Templates/gcc/startup_$(CMSIS_MCU_LOWER).o
 
 CROSS_COMPILE = arm-none-eabi-
 
@@ -44,6 +51,7 @@ CFLAGS_CORTEX_M = -mthumb
 # Options for particular MCU series
 CFLAGS_MCU_f4 = $(CFLAGS_CORTEX_M) -mtune=cortex-m4 -mcpu=cortex-m4
 CFLAGS_MCU_f7 = $(CFLAGS_CORTEX_M) -mtune=cortex-m7 -mcpu=cortex-m7
+CFLAGS_MCU_h7 = $(CFLAGS_CORTEX_M) -mtune=cortex-m7 -mcpu=cortex-m7
 CFLAGS_MCU_l4 = $(CFLAGS_CORTEX_M) -mtune=cortex-m4 -mcpu=cortex-m4
 
 CFLAGS = $(INC) -Wall -Wpointer-arith -Werror -std=gnu99 -nostdlib $(CFLAGS_MOD) $(CFLAGS_EXTRA)
@@ -55,6 +63,7 @@ CFLAGS += -DSTM32_HAL_H='<stm32$(MCU_SERIES)xx_hal.h>'
 CFLAGS += -DBOARD_$(BOARD)
 CFLAGS += -DAPPLICATION_ADDR=$(TEXT0_ADDR)
 CFLAGS += -DFFCONF_H=\"ports/stm32/mboot/ffconf.h\"
+CFLAGS += -DBUILDING_MBOOT=1
 
 LDFLAGS = -nostdlib -L . -T stm32_generic.ld -Map=$(@:.elf=.map) --cref
 LIBS = $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
@@ -96,7 +105,7 @@ SRC_C = \
 	$(wildcard $(BOARD_DIR)/*.c)
 
 SRC_O = \
-	ports/stm32/boards/startup_stm32$(MCU_SERIES).o \
+	$(STARTUP_FILE) \
 	ports/stm32/resethandler.o \
 
 $(BUILD)/$(HAL_DIR)/Src/stm32$(MCU_SERIES)xx_ll_usb.o: CFLAGS += -Wno-attributes
@@ -170,7 +179,7 @@ GEN_PINS_AF_CONST = $(HEADER_BUILD)/pins_af_const.h
 GEN_PINS_AF_DEFS = $(HEADER_BUILD)/pins_af_defs.h
 GEN_PINS_AF_PY = $(BUILD)/pins_af.py
 
-$(BUILD)/main.o: $(GEN_QSTRDEFS_GENERATED) $(GEN_PINS_AF_DEFS)
+$(OBJ): $(GEN_QSTRDEFS_GENERATED) $(GEN_PINS_AF_DEFS)
 
 $(HEADER_BUILD):
 	$(MKDIR) -p $(BUILD)/genhdr
