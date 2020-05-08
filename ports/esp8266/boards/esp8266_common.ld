@@ -109,6 +109,7 @@ SECTIONS
         *py/nlr*.o*(.literal* .text*)
         *py/obj*.o*(.literal* .text*)
         *py/opmethods.o*(.literal* .text*)
+        *py/pairheap*.o*(.literal* .text*)
         *py/parse*.o*(.literal* .text*)
         *py/profile*.o*(.literal* .text*)
         *py/qstr.o*(.literal* .text*)
@@ -132,6 +133,7 @@ SECTIONS
         *lib/axtls/*.o(.literal*, .text*)
         *lib/berkeley-db-1.xx/*.o(.literal*, .text*)
         *lib/libm/*.o*(.literal*, .text*)
+        *lib/littlefs/*.o*(.literal*, .text*)
         *lib/mp-readline/*.o(.literal*, .text*)
         *lib/netutils/*.o*(.literal*, .text*)
         *lib/timeutils/*.o*(.literal*, .text*)
@@ -139,7 +141,7 @@ SECTIONS
         *lib/utils/sys_stdio_mphal.o*(.literal*, .text*)
         *lib/utils/pyexec.o*(.literal*, .text*)
         *lib/utils/stdout_helpers.o*(.literal*, .text*)
-        *lib/utils/interrupt_char.o*(.literal.mp_hal_set_interrupt_char, .text.mp_hal_set_interrupt_char)
+        *lib/utils/interrupt_char.o*(.literal*, .text*)
         *drivers/bus/*.o(.literal* .text*)
 
         build-*/main.o(.literal* .text*)
@@ -168,6 +170,7 @@ SECTIONS
         *modlwip.o(.literal* .text*)
         *modsocket.o(.literal* .text*)
         *modonewire.o(.literal* .text*)
+        *esp_mphal.o(.literal* .text*)
 
         /* we put as much rodata as possible in this section */
         /* note that only rodata accessed as a machine word is allowed here */
